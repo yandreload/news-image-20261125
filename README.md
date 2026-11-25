@@ -11,43 +11,42 @@ Entry for the make.fun bounty
 ## The image
 
 A 1024×1024 newspaper front page, "THE WORLD IN ONE DAY", summing up
-Wednesday 25 November 2026 in 11 dated stories across 5 regions:
+Wednesday 25 November 2026 in eleven stories from five regions:
 
-- **Lead — Space (Wed 25 Nov):** China's Shenzhou-24 launches, carrying
-  Muhammad Zeeshan Ali — the first Pakistani in orbit and the first
-  foreign astronaut aboard the Tiangong space station.
-- **Gulf (overnight into Wed 25 Nov):** Houthi drone hits Riyadh's
-  tallest tower, wounding 11; Saudi-led coalition strikes Hodeidah port
-  overnight.
-- **Ukraine (Tue–Wed):** Moscow calls Ukrainian ship strikes
-  "terrorism" after Kyiv confirms sinking a Russian corvette off Libya
-  and hitting a cargo ship in the Gulf of Finland; NATO vows space
-  defence amid reports of a Russian nuclear satellite.
-- **Colombia (Tue 24 Nov):** gunmen take about 30 hostages in a
-  Cartagena supermarket after a failed armoured-truck robbery.
-- **Also on Tuesday:** Nasdaq -1.5% and Nvidia -6% on a tariff-hike
-  report; CIA and ODNI hit by a cyber breach; Huawei guilty of stealing
-  trade secrets; Sarkozy and Carla Bruni ordered to trial.
-- **Also in Wednesday's news:** Iran flogs singer Parastoo Ahmadi
-  74 lashes; Gaza death toll 74,746; leaked data on Russian deaths
-  in Mali.
+- **Lead — Space:** China's Shenzhou-24 launches, carrying Muhammad
+  Zeeshan Ali — the first Pakistani in orbit and the first foreign
+  astronaut aboard the Tiangong station.
+- **The Gulf:** a Houthi drone hits Riyadh's tallest tower, wounding
+  11; the Saudi-led coalition strikes Hodeidah port overnight.
+- **Ukraine:** Kyiv confirms sinking the Russian corvette Merkury;
+  Moscow calls the ship strikes "terrorism".
+- **Colombia:** gunmen hold about 30 hostages in a Cartagena
+  supermarket after a failed armoured-truck robbery.
+- **Markets:** Nasdaq down 1.5% and Nvidia about 6% on a tariff-hike
+  report; **Security:** the CIA and ODNI hit by a cyber breach;
+  **Tech:** Huawei found guilty of stealing trade secrets.
+- **France:** Sarkozy and Carla Bruni ordered to trial.
+  **Iran:** singer Parastoo Ahmadi lashed 74 times.
+  **Gaza:** death toll reaches 74,746. **Mali:** leaked data on
+  Russian deaths.
 
-Sources for every story: see [SOURCES.md](SOURCES.md).
+Every story is dated on the image or in [SOURCES.md](SOURCES.md).
 
 ## How it is built
 
-- `generate.py` — local build tool (Pillow + Liberation fonts). Renders
-  `entry.png` from the fixed story text. Not the entrypoint.
+- `generate.py` — the build tool (Python 3.13 + Pillow). It draws the
+  whole front page from the fixed story text in the file and writes
+  `entry.png`. Run it to rebuild the image.
 - `entry.png` — the committed entry image, 1024×1024, under 1 MiB.
-- `main.py` — the entrypoint (Python 3.13, stdlib only). It copies
-  `entry.png` to `/output/entry.png`, exactly as the brief suggests
-  ("the simplest program copies an image the repository holds"). No
-  network, no randomness: two runs write identical bytes.
+- `main.py` — the entrypoint (Python 3.13, standard library only). It
+  copies `entry.png` to `/output/entry.png`. No network, no
+  randomness: two runs write identical bytes.
 
 ## Run it
 
 ```sh
-python3 main.py        # writes /output/entry.png
+python3 generate.py   # rebuild entry.png from the story text
+python3 main.py       # writes /output/entry.png
 ```
 
 ## Verify

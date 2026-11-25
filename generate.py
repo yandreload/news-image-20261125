@@ -1,33 +1,28 @@
 #!/usr/bin/env python3
-"""Render entry.png for the make.fun bounty
-"Sum up 25 November's world news in one image" (news-image-20261125).
+"""Render the 25 November 2026 newspaper front page to entry.png.
 
-Local build tool only -- NOT the entrypoint. The entrypoint is main.py,
-which only copies the committed entry.png to /output/entry.png, so the
-submitted program needs no network, no Pillow and no fonts at run time.
-
-Run:  python3 generate.py   (writes entry.png next to this file)
-Requires Pillow + Liberation fonts locally (present on this VM).
-Deterministic: fixed text, fixed layout, fixed PNG encoder settings.
+A single 1024x1024 broadsheet: masthead, one lead story, and ten
+short stories in a two-column grid. Every word is fixed in this file,
+so two runs produce the same bytes.
 """
-import textwrap
+
+import os
 from PIL import Image, ImageDraw, ImageFont
 
+HERE = os.path.dirname(os.path.abspath(__file__))
+OUT = os.path.join(HERE, "entry.png")
+
 W, H = 1024, 1024
-OUT = "entry.png"
+PAPER = (248, 244, 233)
+LEAD_BG = (239, 231, 207)
+INK = (20, 20, 20)
+RED = (163, 18, 18)
+GREY = (90, 83, 72)
 
-SERIF = "/usr/share/fonts/truetype/liberation/LiberationSerif-Bold.ttf"
+SERIF_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf"
+SERIF = "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf"
 SANS = "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
-SANS_B = "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
-
-NAVY = (15, 42, 68)
-NAVY2 = (23, 64, 100)
-RED = (178, 34, 34)
-GOLD = (201, 162, 39)
-INK = (24, 24, 24)
-GREY = (88, 88, 88)
-PAPER = (250, 248, 243)
-LINE = (200, 196, 188)
+SANS_BOLD = "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
 
 
 def font(path, size):
@@ -35,157 +30,210 @@ def font(path, size):
 
 
 def wrap(draw, text, fnt, width):
-    """Wrap text to fit pixel width, returning lines."""
-    lines = []
-    for para in text.split("\n"):
-        words, cur = para.split(), ""
-        for w in words:
-            trial = (cur + " " + w).strip()
-            if draw.textlength(trial, font=fnt) <= width:
-                cur = trial
-            else:
-                if cur:
-                    lines.append(cur)
-                cur = w
-        if cur:
-            lines.append(cur)
+    """Greedy word wrap; returns a list of lines that fit `width`."""
+    lines, cur = [], ""
+    for word in text.split():
+        trial = word if not cur else cur + " " + word
+        if draw.textlength(trial, font=fnt) <= width:
+            cur = trial
+        else:
+            if cur:
+                lines.append(cur)
+            cur = word
+    if cur:
+        lines.append(cur)
     return lines
 
 
-def para(draw, xy, text, fnt, width, fill=INK, leading=None):
-    x, y = xy
-    leading = leading or int(fnt.size * 1.28)
-    for line in wrap(draw, text, fnt, width):
-        draw.text((x, y), line, font=fnt, fill=fill)
-        y += leading
-    return y
+def fit_text(draw, text, path, size, width, min_size=14):
+    """Largest font size (down to min_size) whose single line fits."""
+    while size > min_size and draw.textlength(text, font=font(path, size)) > width:
+        size -= 1
+    return font(path, size)
 
 
-def kicker(draw, xy, text, color=RED):
-    f = font(SANS_B, 21)
-    draw.text(xy, text.upper(), font=f, fill=color)
-    return xy[1] + 28
+def fit_body(draw, text, path, size, width, max_lines, min_size=13):
+    """Largest font size whose wrapped body fits in max_lines lines."""
+    while size > min_size:
+        fnt = font(path, size)
+        if len(wrap(draw, text, fnt, width)) <= max_lines:
+            return fnt, wrap(draw, text, fnt, width)
+        size -= 1
+    fnt = font(path, size)
+    return fnt, wrap(draw, text, fnt, width)[:max_lines]
 
 
-def headline(draw, xy, text, size, width, fill=INK):
-    f = font(SERIF, size)
-    return para(draw, xy, text, f, width, fill=fill, leading=int(size * 1.08))
+def headline_block(draw, x, y, width, text, path, size, max_lines, lh):
+    """Draw a wrapped headline; returns the y just below it."""
+    fnt = font(path, size)
+    lines = wrap(draw, text, fnt, width)[:max_lines]
+    for i, line in enumerate(lines):
+        draw.text((x, y + i * lh), line, font=fnt, fill=INK)
+    return y + len(lines) * lh
 
 
-def rule(draw, x0, y, x1, w=2, color=LINE):
-    draw.line([(x0, y), (x1, y)], fill=color, width=w)
+LEAD = {
+    "kicker": "SPACE  ·  LEAD STORY",
+    "headline": "First Pakistani in orbit as Shenzhou-24 reaches Tiangong",
+    "body": (
+        "China's Shenzhou-24 lifted off from Jiuquan carrying Muhammad "
+        "Zeeshan Ali, the first Pakistani in orbit and the first foreign "
+        "astronaut aboard the Tiangong station. A crew of three, on a "
+        "five-to-ten-day mission."
+    ),
+}
+
+STORIES = [
+    {
+        "kicker": "THE GULF",
+        "headline": "Drone hits Riyadh tower; 11 hurt",
+        "body": (
+            "Houthi fighters hit Riyadh's tallest tower Tuesday, wounding "
+            "11. The coalition struck Hodeidah port overnight."
+        ),
+    },
+    {
+        "kicker": "UKRAINE",
+        "headline": "Kyiv confirms sinking of corvette",
+        "body": (
+            "Ukraine says naval drones sank the corvette Merkury off Libya "
+            "and hit ships in the Baltic. Moscow calls the strikes terrorism."
+        ),
+    },
+    {
+        "kicker": "COLOMBIA",
+        "headline": "Hostage standoff in Cartagena",
+        "body": (
+            "Gunmen seized an Éxito supermarket after a failed "
+            "armoured-truck robbery, holding about 30 people. Talks ran "
+            "into the night."
+        ),
+    },
+    {
+        "kicker": "MARKETS",
+        "headline": "Nasdaq slides on tariff fears",
+        "body": (
+            "Nasdaq fell 1.5% and Nvidia about 6% on a report the US is "
+            "preparing tariff rises on China, the EU and 14 others."
+        ),
+    },
+    {
+        "kicker": "SECURITY",
+        "headline": "CIA and ODNI hit by breach",
+        "body": (
+            "US intelligence agencies suffered a cyber breach involving "
+            "some unclassified information, officials confirmed Tuesday."
+        ),
+    },
+    {
+        "kicker": "TECH",
+        "headline": "Huawei guilty of trade-secret theft",
+        "body": (
+            "A US court found China's Huawei guilty of stealing trade "
+            "secrets in a criminal trial; it was acquitted of racketeering."
+        ),
+    },
+    {
+        "kicker": "FRANCE",
+        "headline": "Sarkozy and Bruni face trial",
+        "body": (
+            "French officials ordered a corruption case involving "
+            "ex-president Nicolas Sarkozy and his wife Carla Bruni to trial."
+        ),
+    },
+    {
+        "kicker": "IRAN",
+        "headline": "Singer lashed 74 times in Iran",
+        "body": (
+            "Parastoo Ahmadi was lashed 74 times in Qom over a 2024 "
+            "YouTube concert performed without a hijab. Her team was lashed too."
+        ),
+    },
+    {
+        "kicker": "GAZA",
+        "headline": "Gaza death toll reaches 74,746",
+        "body": (
+            "The toll from Israeli attacks reached 74,746, the WAFA news "
+            "agency reported on Wednesday."
+        ),
+    },
+    {
+        "kicker": "MALI",
+        "headline": "Leaked data on Russian deaths in Mali",
+        "body": (
+            "Leaked data shed new light on Russian deaths in Mali, "
+            "reports said on Wednesday."
+        ),
+    },
+]
 
 
-def bullet(draw, x, y, text, fnt, width, fill=INK, dot=RED):
-    draw.ellipse([x, y + 8, x + 9, y + 17], fill=dot)
-    return para(draw, (x + 18, y), text, fnt, width - 18, fill=fill,
-                leading=int(fnt.size * 1.3))
+def draw_masthead(draw):
+    date_fnt = font(SANS, 18)
+    date = "WEDNESDAY, 25 NOVEMBER 2026"
+    draw.text(((W - draw.textlength(date, font=date_fnt)) / 2, 36),
+              date, font=date_fnt, fill=GREY)
+    title_fnt = fit_text(draw, "THE WORLD IN ONE DAY", SERIF_BOLD, 56, 940)
+    title = "THE WORLD IN ONE DAY"
+    draw.text(((W - draw.textlength(title, font=title_fnt)) / 2, 60),
+              title, font=title_fnt, fill=INK)
+    sub_fnt = font(SANS, 19)
+    sub = "ELEVEN STORIES  ·  ONE DAY IN THE WORLD"
+    draw.text(((W - draw.textlength(sub, font=sub_fnt)) / 2, 128),
+              sub, font=sub_fnt, fill=GREY)
+    draw.line([(40, 154), (984, 154)], fill=INK, width=3)
+    draw.line([(40, 160), (984, 160)], fill=INK, width=1)
 
 
-def main():
+def draw_lead(draw):
+    draw.rectangle([40, 174, 984, 344], fill=LEAD_BG, outline=INK, width=1)
+    kicker_fnt = font(SANS_BOLD, 19)
+    draw.text((56, 190), LEAD["kicker"], font=kicker_fnt, fill=RED)
+    after = headline_block(draw, 56, 216, 912, LEAD["headline"],
+                           SERIF_BOLD, 29, 2, 34)
+    body_fnt, lines = fit_body(draw, LEAD["body"], SANS, 19, 912, 2)
+    for i, line in enumerate(lines):
+        draw.text((56, after + 6 + i * 25), line, font=body_fnt, fill=INK)
+
+
+def draw_story(draw, box, story):
+    x, y, w, h = box
+    draw.line([(x, y), (x + w, y)], fill=INK, width=2)
+    kicker_fnt = font(SANS_BOLD, 15)
+    draw.text((x, y + 8), story["kicker"], font=kicker_fnt, fill=RED)
+    head_fnt = fit_text(draw, story["headline"], SERIF_BOLD, 21, w, 16)
+    draw.text((x, y + 28), story["headline"], font=head_fnt, fill=INK)
+    body_fnt, lines = fit_body(draw, story["body"], SANS, 17, w, 2)
+    lh = body_fnt.size + 4
+    for i, line in enumerate(lines):
+        draw.text((x, y + 56 + i * lh), line, font=body_fnt, fill=INK)
+
+
+def draw_footer(draw):
+    fnt = font(SANS, 14)
+    note = "Sources: Reuters · AP · The Wall Street Journal · Xinhua · ISW · CNN — full list in SOURCES.md"
+    draw.text(((W - draw.textlength(note, font=fnt)) / 2, 985),
+              note, font=fnt, fill=GREY)
+
+
+def build():
     img = Image.new("RGB", (W, H), PAPER)
-    d = ImageDraw.Draw(img)
-
-    # ---------- masthead ----------
-    d.rectangle([0, 0, W, 148], fill=NAVY)
-    d.rectangle([0, 148, W, 154], fill=GOLD)
-    d.text((36, 22), "THE WORLD IN ONE DAY", font=font(SERIF, 50),
-           fill=(255, 255, 255))
-    d.text((36, 90), "WEDNESDAY  25  NOVEMBER  2026", font=font(SANS_B, 28),
-           fill=GOLD)
-    d.text((772, 30), "ONE IMAGE.", font=font(SANS_B, 22), fill=(255, 255, 255))
-    d.text((772, 58), "THE WHOLE DAY.", font=font(SANS_B, 22),
-           fill=(255, 255, 255))
-    d.text((772, 96), "11 stories · 5 regions",
-           font=font(SANS, 20), fill=(200, 210, 220))
-
-    # ---------- lead: Shenzhou-24 ----------
-    y = 178
-    y = kicker(d, (36, y), "Lead story  —  Space  ·  Wed 25 Nov")
-    y = headline(d, (36, y + 2),
-                 "Pakistan's first astronaut\nreaches orbit",
-                 48, 640)
-    y = para(d, (36, y + 8),
-             "China's Shenzhou-24 blasted off from Jiuquan at 00:18 UTC on "
-             "Wednesday, carrying Muhammad Zeeshan Ali — the first "
-             "Pakistani in orbit and the first foreign astronaut aboard "
-             "China's Tiangong space station. He will spend about a week "
-             "in orbit running biotech experiments.",
-             font(SANS, 22), 640)
-    # right-hand fact box: Tiangong
-    d.rectangle([712, 178, 988, 452], outline=NAVY2, width=3)
-    d.rectangle([712, 178, 988, 222], fill=NAVY2)
-    d.text((730, 186), "TIANGONG'S FIRST GUEST", font=font(SANS_B, 17),
-           fill=(255, 255, 255))
-    d.text((730, 240), "Tiangong station", font=font(SERIF, 30), fill=INK)
-    para(d, (730, 282),
-         "China's first joint\ncrewed flight with a\nforeign astronaut.\nAli returns on\nShenzhou-23.",
-         font(SANS, 20), 240)
-    d.text((730, 420), "First Pakistani in orbit.",
-           font=font(SANS_B, 20), fill=RED)
-
-    rule(d, 36, 478, 988)
-
-    # ---------- row 2: Gulf | Ukraine ----------
-    y = 496
-    # Gulf (left)
-    y1 = kicker(d, (36, y), "Gulf  ·  overnight into Wed 25 Nov")
-    y1 = headline(d, (36, y1 + 2), "Houthis hit Riyadh tower;\ncoalition hits Hodeidah", 34, 440)
-    y1 = para(d, (36, y1 + 6),
-              "A Houthi drone hit Riyadh's tallest tower on Tuesday, "
-              "wounding 11 — the second strike in under a week. The "
-              "Saudi-led coalition hit Hodeidah port overnight into "
-              "Wednesday.",
-              font(SANS, 21), 440)
-    # Ukraine (right)
-    x2 = 528
-    y2 = kicker(d, (x2, y), "Ukraine  ·  Tue–Wed 25 Nov")
-    y2 = headline(d, (x2, y2 + 2), "Moscow calls ship\nstrikes 'terrorism'", 34, 440)
-    y2 = para(d, (x2, y2 + 6),
-              "Zelenskiy confirms Ukraine sank a Russian corvette off "
-              "Libya and hit a cargo ship in the Gulf of Finland. NATO "
-              "vows space defence amid reports of a Russian nuclear "
-              "satellite.",
-              font(SANS, 21), 440)
-
-    rule(d, 36, 736, 988)
-    d.line([(504, 496), (504, 724)], fill=LINE, width=2)
-
-    # ---------- row 3: Cartagena | Also on Tuesday ----------
-    y = 752
-    y1 = kicker(d, (36, y), "Colombia  ·  Tue 24 Nov")
-    y1 = headline(d, (36, y1 + 2), "30 hostages seized in\nCartagena supermarket", 34, 440)
-    y1 = para(d, (36, y1 + 6),
-              "Gunmen took about 30 hostages in an Éxito supermarket "
-              "after a failed armoured-truck robbery. Ten were freed; "
-              "about 20 still held.",
-              font(SANS, 20), 440)
-    x2 = 528
-    y2 = kicker(d, (x2, y), "Also on Tuesday", color=NAVY2)
-    yy = y2 + 4
-    yy = bullet(d, x2, yy, "Nasdaq -1.5% and Nvidia -6% on tariff-hike "
-                "report.", font(SANS, 19), 440)
-    yy = bullet(d, x2, yy + 6, "CIA and ODNI hit by cyber breach.",
-                font(SANS, 19), 440)
-    yy = bullet(d, x2, yy + 6, "Huawei guilty of stealing trade secrets.",
-                font(SANS, 19), 440)
-    yy = bullet(d, x2, yy + 6, "Sarkozy and Carla Bruni ordered to trial.",
-                font(SANS, 19), 440)
-
-    # ---------- footer ----------
-    d.rectangle([0, 948, W, H], fill=NAVY)
-    d.text((36, 958), "ALSO IN WEDNESDAY'S NEWS  —",
-           font=font(SANS_B, 20), fill=GOLD)
-    d.text((36, 980), "Iran flogs singer Parastoo Ahmadi 74 lashes  ·  "
-           "Gaza death toll 74,746  ·  Russian deaths in Mali",
-           font=font(SANS, 19), fill=(255, 255, 255))
-    d.text((36, 1004), "Sources: Reuters · AP · Xinhua · CNN · BBC · WSJ · "
-           "AFP — as reported 25 Nov 2026",
-           font=font(SANS, 16), fill=(170, 185, 200))
-
-    img.save(OUT, format="PNG", optimize=True)
+    draw = ImageDraw.Draw(img)
+    draw.rectangle([14, 14, 1010, 1010], outline=INK, width=2)
+    draw.rectangle([22, 22, 1002, 1002], outline=INK, width=1)
+    draw_masthead(draw)
+    draw_lead(draw)
+    col_w = 464
+    xs = [40, 520]
+    y0, row_h, gap = 360, 118, 8
+    for i, story in enumerate(STORIES):
+        row, col = divmod(i, 2)
+        draw_story(draw, (xs[col], y0 + row * (row_h + gap), col_w, row_h),
+                   story)
+    draw_footer(draw)
+    img.save(OUT, format="PNG")
     print(f"wrote {OUT} {W}x{H}")
 
 
 if __name__ == "__main__":
-    main()
+    build()
