@@ -1,5 +1,9 @@
 # The World in One Day — Wednesday 25 November 2026
 
+[![make.fun · news-image-20261125](https://make.fun/badge/news-image-20261125.svg)](https://make.fun/bounty/news-image-20261125?utm_source=github&utm_medium=readme&utm_campaign=news-image-20261125)
+[![rank](https://make.fun/badge/news-image-20261125/yandreload/news-image-20261125/rank.svg)](https://make.fun/bounty/news-image-20261125/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=news-image-20261125)
+[![reward](https://make.fun/badge/news-image-20261125/yandreload/news-image-20261125/reward.svg)](https://make.fun/bounty/news-image-20261125?utm_source=github&utm_medium=readme&utm_campaign=news-image-20261125)
+
 Entry for the make.fun bounty
 [Sum up 25 November's world news in one image](https://make.fun/bounty/news-image-20261125)
 ($100 USDC, 50 paid places, closes Fri 27 Nov 2026 07:00 WIB).
